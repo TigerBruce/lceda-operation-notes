@@ -15,49 +15,53 @@ docs/01-getting-started-and-safe-workflow.md
 
 请按这个流程做：
 
-1. 如果本机还没有仓库，执行：
+1. 先确认嘉立创 EDA 专业版里已经安装 `Run API Gateway` 扩展。
+   具体确认方式：EDA 顶部菜单栏必须能看到 `API Gateway` 菜单。
+   如果看不到 `API Gateway` 菜单，立刻暂停并告诉我：
+   “请先按视频手动安装 Run API Gateway 扩展，安装完成后我再继续。”
+   不要替我自动导入 `.eext`，也不要把扩展安装步骤复杂化。
+
+2. 如果本机还没有仓库，执行：
    git clone https://github.com/TigerBruce/lceda-operation-notes.git
    然后进入仓库并读取 docs/01-getting-started-and-safe-workflow.md。
    如果本机已经有这个仓库，直接读取本地文档，不要重复克隆。
 
-2. 使用文档里的 5 分钟 Fast Install Runbook。
+3. 使用文档里的 5 分钟 Fast Install Runbook。
    不要默认使用 npx clawhub install easyeda-api，因为实测会超时。
    Windows PowerShell 里不要直接用 npm，统一用 npm.cmd / npx.cmd。
 
-3. 安装或确认：
+4. 安装或确认：
    - opencode-ai
    - easyeda-api Skill
-   - Run API Gateway v1.0.5 .eext 扩展包
+   - Run API Gateway 扩展已经由用户手动安装，并且 EDA 顶部能看到 API Gateway 菜单
    - easyeda bridge server
 
-4. 优先使用官方直链：
+5. 优先使用官方直链安装 easyeda-api Skill：
    - https://image.lceda.cn/files/easyeda-api.zip
-   - https://image.lceda.cn/extensions/files/ec1cd4bbb33446e685b10306e0aa2e0e-run-api-gateway_v1.0.5.eext
-   如果 eext 固定直链失效，就用文档里的官方 API 自动解析最新已审核版本，不要改成人工网页查找。
+   `Run API Gateway` 扩展不要在这里自动安装；用户会按视频手动安装。
 
-5. 如果 EDA 顶部已经有 API Gateway 菜单，说明扩展已安装。
-   如果没有，下载 eext 后打开文件所在目录，让我只确认一次导入扩展。
-   注意：不要让我手动点“重新连接”。扩展安装后，你必须按文档用脚本自动点击 API Gateway -> 重新连接。
+6. 不要让我手动点“重新连接”。
+   确认 `API Gateway` 菜单存在后，你必须按文档用脚本自动点击 API Gateway -> 重新连接。
 
-6. 启动 bridge server：
+7. 启动 bridge server：
    $HOME\.config\opencode\skills\easyeda-api\scripts\bridge-server.mjs
    后台启动，不要阻塞终端。
 
-7. 用 /health 检查 49620-49629：
+8. 用 /health 检查 49620-49629：
    必须看到 service=easyeda-bridge、status=ok、edaConnected=true。
    如果 edaConnected=false，按文档自动点击 API Gateway -> 重新连接，然后再查。
 
-8. 首次只读验证必须一个 API 一个请求，不要 Promise.all 混合多个 API：
+9. 首次只读验证必须一个 API 一个请求，不要 Promise.all 混合多个 API：
    - return await eda.dmt_Project.getCurrentProjectInfo();
    - return await eda.dmt_SelectControl.getCurrentDocumentInfo();
    - return await eda.dmt_Schematic.getCurrentSchematicPageInfo();
 
-9. 如果 /execute 返回 HTTP 500：
+10. 如果 /execute 返回 HTTP 500：
    不要立刻重试同一个请求。
    先查 /health。
    如果 EDA WebSocket 断开，先自动重连，再只重试最小只读 API。
 
-10. 安装完成后汇报：
+11. 安装完成后汇报：
    - bridge 端口
    - edaConnected 状态
    - activeWindowId
