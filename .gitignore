@@ -1,2 +1,31 @@
-/截图/*
-!/截图/.gitkeep
+# Local / generated artifacts
+_local/
+tmp/
+out/
+captures/
+/screenshots/
+/截图/
+源码导出检查/
+电气复核/
+
+# EasyEDA / LCEDA project data
+*.epro
+*.epro2
+*.eprj
+*.eprj2
+*.epru
+*.epcb
+*.esch
+
+# Generated electrical/manufacturing data
+*.enet
+*.bom
+*.csv
+*.xlsx
+
+# Raw dumps and personal project diagnostics
+*_source_*.txt
+*backup*.json
+*footprint*.json
+*netcheck*.json
+*错配*.json

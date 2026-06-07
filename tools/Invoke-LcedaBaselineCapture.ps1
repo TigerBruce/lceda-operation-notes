@@ -264,6 +264,7 @@ return await (async () => {
     .map(group => ({ count: group.length, content: group[0].content, x: group[0].x, y: group[0].y, ids: group.map(t => t.id) }));
 
   const drc = await eda.sch_Drc.check(false, false, false);
+  const strictDrc = await eda.sch_Drc.check(true, false, false);
   let netlist = { available: false };
   try {
     const file = await eda.sch_ManufactureData.getNetlistFile('baseline-net.json');
@@ -289,6 +290,43 @@ return await (async () => {
       const selected = {};
       for (const des of wanted) {
         if (byDesignator[des]) selected[des] = byDesignator[des];
+      }
+      const pinStates = {};
+      for (const comp of comps) {
+        if (comp.componentType !== 'part' || !comp.designator) continue;
+        let pins = [];
+        try {
+          pins = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(comp.primitiveId);
+        } catch (_) {
+          pins = [];
+        }
+        for (const pin of pins) {
+          pinStates[`${comp.designator}:${pin.pinNumber}`] = {
+            designator: comp.designator,
+            pin: String(pin.pinNumber),
+            name: pin.pinName || '',
+            noConnected: !!pin.noConnected,
+            x: pin.x,
+            y: pin.y
+          };
+        }
+      }
+      const noNetNotMarked = [];
+      const connectedButNoConnect = [];
+      for (const entry of entries) {
+        const des = entry?.props?.Designator || '';
+        if (!des) continue;
+        for (const pin of Object.values(entry.pinInfoMap || {})) {
+          const key = `${des}:${pin.number}`;
+          const state = pinStates[key];
+          const net = pin.net || '';
+          if (!net && state && !state.noConnected) {
+            noNetNotMarked.push({ ...state, net });
+          }
+          if (net && state && state.noConnected) {
+            connectedButNoConnect.push({ ...state, net });
+          }
+        }
       }
       const expectedPins = {
         FPC1: { '1': '+5V_IN', '2': 'MCU_UART_TXD', '3': 'GND', '4': 'MCU_UART_RXD', '5': 'GND', '6': 'GND' },
@@ -376,6 +414,10 @@ return await (async () => {
         componentCount: entries.length,
         duplicateDetailedPagesLikely: !!(byDesignator.U1 && byDesignator.U2),
         selected,
+        pinConnectionConsistency: {
+          noNetNotMarked,
+          connectedButNoConnect
+        },
         validation,
         legacyComparison
       };
@@ -392,6 +434,7 @@ return await (async () => {
     components: comps.map(pickComp).filter(c => keyDesignators.includes(c.designator)),
     keyWires: wires.map(pickWire).filter(w => keyNets.includes(w.net)),
     drc,
+    strictDrc,
     netlist
   };
 })()
@@ -416,12 +459,15 @@ $notes = @"
 # $timestamp $PageName review
 
 - Soft DRC: $($audit.drc)
+- Strict DRC: $($audit.strictDrc)
 - Components / wires / texts: $($audit.counts.components) / $($audit.counts.wires) / $($audit.counts.texts)
 - Duplicate text groups: $($audit.duplicateTexts.Count)
 - Project netlist component count: $($audit.netlist.componentCount)
 - Old page and golden page both in netlist: $($audit.netlist.duplicateDetailedPagesLikely)
 - Expected pin validation pass: $($audit.netlist.validation.pass)
 - Legacy/golden pin-net differences: $legacyDifferenceCount
+- No-net pins without no-connect: $($audit.netlist.pinConnectionConsistency.noNetNotMarked.Count)
+- Connected pins marked no-connect: $($audit.netlist.pinConnectionConsistency.connectedButNoConnect.Count)
 - Screenshot mode: $(if ($UseApiRenderedAreaShots) { 'api_rendered_area' } elseif ($SkipImages) { 'skip_images' } else { 'current_window' })
 
 Review focus:
@@ -429,6 +475,7 @@ Review focus:
 - Check screenshots for net label overlap near MCU pins and connector pins.
 - Confirm only one detailed page participates in BOM/PCB before manufacturing output.
 - If `duplicateTexts` is non-zero, inspect whether repeated text objects are intentional or residue.
+- If `Connected pins marked no-connect` is non-zero, inspect for hidden no-connect state on connected pins.
 - On EasyEDA Pro V3.2.121, DMT zoom APIs may return a viewport area without changing the visible UI; current-window screenshots are the reliable default.
 "@
 $reviewNotesName = New-UnicodeString @(0x5BA1, 0x56FE, 0x7B14, 0x8BB0)
@@ -443,7 +490,10 @@ Write-Utf8File -Path $manifestPath -Content ($manifest | ConvertTo-Json -Depth 4
 
 Write-Host "Capture complete: $outDir"
 Write-Host "Soft DRC: $($audit.drc)"
+Write-Host "Strict DRC: $($audit.strictDrc)"
 Write-Host "Duplicate text groups: $($audit.duplicateTexts.Count)"
 Write-Host "Old page and golden page both in netlist: $($audit.netlist.duplicateDetailedPagesLikely)"
 Write-Host "Expected pin validation pass: $($audit.netlist.validation.pass)"
 Write-Host "Legacy/golden pin-net differences: $legacyDifferenceCount"
+Write-Host "No-net pins without no-connect: $($audit.netlist.pinConnectionConsistency.noNetNotMarked.Count)"
+Write-Host "Connected pins marked no-connect: $($audit.netlist.pinConnectionConsistency.connectedButNoConnect.Count)"
